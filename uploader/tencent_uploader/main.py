@@ -724,25 +724,68 @@ class TencentVideo(TencentBaseUploader):
         await file_input.set_input_files(self.thumbnail_path)
         await page.wait_for_timeout(1000)
 
-        crop_dialog = page.locator("div.weui-desktop-dialog").filter(has_text="裁剪封面图").first
+        crop_dialog = page.locator("div.weui-desktop-dialog:visible").filter(has_text="裁剪封面图").first
         if await crop_dialog.count():
             try:
                 await crop_dialog.wait_for(state="visible", timeout=10000)
-                crop_confirm_button = crop_dialog.locator(
-                    'div.weui-desktop-dialog__ft button.weui-desktop-btn_primary:has-text("确定")'
-                ).first
-                if await crop_confirm_button.count():
-                    await crop_confirm_button.wait_for(state="visible", timeout=5000)
-                    await crop_confirm_button.click()
-                    await page.wait_for_timeout(1000)
+                crop_confirm_selectors = [
+                    'div.weui-desktop-dialog:visible div.weui-desktop-dialog__ft button.weui-desktop-btn_primary:has-text("确定")',
+                    'div.weui-desktop-dialog:visible button:has-text("确定")',
+                    'div.weui-desktop-dialog:visible button:has-text("确认")',
+                ]
+                for selector in crop_confirm_selectors:
+                    crop_confirm_button = page.locator(selector).last
+                    if await crop_confirm_button.count():
+                        await crop_confirm_button.wait_for(state="visible", timeout=5000)
+                        await crop_confirm_button.click()
+                        tencent_logger.info(_msg("🖼️", "封面裁剪弹窗已点确定"))
+                        await page.wait_for_timeout(1500)
+                        break
             except Exception as exc:
                 tencent_logger.warning(_msg("😵", f"封面裁剪确认时出错，小人继续尝试保存主弹窗: {exc}"))
 
-        confirm_button = cover_dialog.locator(
-            'div.weui-desktop-dialog__ft button.weui-desktop-btn_primary:has-text("确认")'
-        ).first
-        await confirm_button.wait_for(state="visible", timeout=10000)
-        await confirm_button.click()
+        confirm_selectors = [
+            'div.weui-desktop-dialog:visible div.weui-desktop-dialog__ft button.weui-desktop-btn_primary:has-text("确认")',
+            'div.weui-desktop-dialog:visible div.weui-desktop-dialog__ft button.weui-desktop-btn_primary:has-text("确定")',
+            'div.weui-desktop-dialog:visible button:has-text("确认")',
+            'div.weui-desktop-dialog:visible button:has-text("完成")',
+            'div.weui-desktop-dialog:visible button:has-text("保存")',
+            'div.weui-desktop-dialog:visible button:has-text("确定")',
+        ]
+        clicked_confirm = False
+        for selector in confirm_selectors:
+            confirm_button = page.locator(selector).last
+            try:
+                if not await confirm_button.count():
+                    continue
+                await confirm_button.wait_for(state="visible", timeout=5000)
+                await confirm_button.click()
+                clicked_confirm = True
+                tencent_logger.info(_msg("🖼️", f"封面主弹窗已点击确认按钮: {selector}"))
+                await page.wait_for_timeout(2000)
+                break
+            except Exception:
+                continue
+
+        if not clicked_confirm:
+            screenshot_path = Path(BASE_DIR) / "publish_logs" / "screenshots" / f"tencent_cover_confirm_not_found_{int(time.time())}.png"
+            screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            raise RuntimeError(f"封面已上传但没有找到可点击的确认/完成按钮，截图: {screenshot_path}")
+
+        remaining_cover_dialog = page.locator("div.weui-desktop-dialog:visible").filter(has_text="编辑个人主页卡片").first
+        if await remaining_cover_dialog.count():
+            tencent_logger.warning(_msg("😵", "封面确认后弹窗仍可见，小人再尝试点一次确认"))
+            for selector in confirm_selectors:
+                confirm_button = page.locator(selector).last
+                try:
+                    if await confirm_button.count():
+                        await confirm_button.click()
+                        await page.wait_for_timeout(1500)
+                        break
+                except Exception:
+                    continue
+
         tencent_logger.success(_msg("🥳", "封面已经设置完成"))
 
     async def prepare_video_for_publish(self, page: Page) -> None:
