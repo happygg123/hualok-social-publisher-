@@ -3,13 +3,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
 
 SUPPORTED_PLATFORMS = {"tencent", "douyin", "xiaohongshu"}
 DEFAULT_ACTION = "upload-video"
+DEFAULT_TIMEOUT_SECONDS = 1800
 
 
 def now_str() -> str:
@@ -74,7 +77,45 @@ def build_command(row: dict, index: int, headed: bool, headless: bool) -> list[s
     return cmd
 
 
-def run_one(row: dict, index: int, total: int, log_dir: Path, headed: bool, headless: bool) -> dict:
+def kill_process_tree(pid: int) -> None:
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, text=True)
+    else:
+        try:
+            os.killpg(pid, 9)
+        except Exception:
+            subprocess.run(["kill", "-9", str(pid)], capture_output=True, text=True)
+
+
+def run_command_with_timeout(cmd: list[str], timeout_seconds: int) -> tuple[int | None, str, str, bool]:
+    creationflags = 0
+    preexec_fn = None
+    if os.name == "nt":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        preexec_fn = os.setsid
+
+    process = subprocess.Popen(
+        cmd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=creationflags,
+        preexec_fn=preexec_fn,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+        return process.returncode, stdout, stderr, False
+    except subprocess.TimeoutExpired:
+        kill_process_tree(process.pid)
+        stdout, stderr = process.communicate()
+        stderr = (stderr or "") + f"\nTIMEOUT: command exceeded {timeout_seconds} seconds and was killed."
+        return process.returncode, stdout or "", stderr, True
+
+
+def run_one(row: dict, index: int, total: int, log_dir: Path, headed: bool, headless: bool, timeout_seconds: int) -> dict:
     platform = (row.get("platform") or "unknown").strip().lower()
     result = {
         "index": index,
@@ -89,22 +130,19 @@ def run_one(row: dict, index: int, total: int, log_dir: Path, headed: bool, head
         "stdout": "",
         "stderr": "",
         "returncode": None,
+        "timed_out": False,
+        "timeout_seconds": timeout_seconds,
     }
 
     try:
         cmd = build_command(row, index, headed=headed, headless=headless)
         result["command"] = cmd
-        completed = subprocess.run(
-            cmd,
-            text=True,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        result["returncode"] = completed.returncode
-        result["stdout"] = completed.stdout
-        result["stderr"] = completed.stderr
-        result["status"] = "success" if completed.returncode == 0 else "failed"
+        returncode, stdout, stderr, timed_out = run_command_with_timeout(cmd, timeout_seconds)
+        result["returncode"] = returncode
+        result["stdout"] = stdout
+        result["stderr"] = stderr
+        result["timed_out"] = timed_out
+        result["status"] = "success" if returncode == 0 and not timed_out else "failed"
     except Exception as exc:
         result["status"] = "failed"
         result["stderr"] = str(exc)
@@ -127,6 +165,7 @@ def main() -> int:
     parser.add_argument("--log-dir", default="publish_logs", help="日志目录")
     parser.add_argument("--headed", action="store_true", help="有头浏览器运行，适合首次联调")
     parser.add_argument("--headless", action="store_true", help="无头运行")
+    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS, help="每条发布任务最长秒数，超时会杀掉子进程树")
     args = parser.parse_args()
 
     csv_path = Path(args.csv).expanduser()
@@ -142,15 +181,23 @@ def main() -> int:
     results = []
 
     for index, row in enumerate(rows, start=1):
-        print(f"[{index}/{len(rows)}] 发布 {row.get('platform')} - {row.get('file')}")
-        result = run_one(row, index, len(rows), log_dir, headed=args.headed, headless=args.headless)
+        print(f"[{index}/{len(rows)}] 发布 {row.get('platform')} - {row.get('file')}", flush=True)
+        result = run_one(
+            row,
+            index,
+            len(rows),
+            log_dir,
+            headed=args.headed,
+            headless=args.headless,
+            timeout_seconds=args.timeout,
+        )
         results.append(result)
         if result["status"] == "success":
             success += 1
-            print("  成功")
+            print("  成功", flush=True)
         else:
             failed += 1
-            print(f"  失败: {result['stderr'][-500:]}")
+            print(f"  失败: {result['stderr'][-500:]}", flush=True)
 
     summary = {
         "time": now_str(),
@@ -166,12 +213,13 @@ def main() -> int:
                 "title": item["title"],
                 "status": item["status"],
                 "returncode": item["returncode"],
+                "timed_out": item["timed_out"],
             }
             for item in results
         ],
     }
     (log_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"完成：成功 {success}，失败 {failed}。日志：{log_dir}")
+    print(f"完成：成功 {success}，失败 {failed}。日志：{log_dir}", flush=True)
     return 0 if failed == 0 else 1
 
 

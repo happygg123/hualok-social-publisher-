@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -573,8 +574,14 @@ class TencentBaseUploader(BaseVideoUploader):
             if await declare_button.count():
                 await declare_button.click()
 
-    async def wait_for_upload_complete(self, page: Page) -> None:
+    async def wait_for_upload_complete(self, page: Page, timeout_seconds: int = 900) -> None:
+        start_time = time.monotonic()
         while True:
+            if time.monotonic() - start_time > timeout_seconds:
+                screenshot_path = Path(BASE_DIR) / "publish_logs" / "screenshots" / f"tencent_upload_timeout_{int(time.time())}.png"
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                await page.screenshot(path=str(screenshot_path), full_page=True)
+                raise TimeoutError(f"等待视频号上传完成超时，截图: {screenshot_path}")
             try:
                 publish_button = page.get_by_role("button", name="发表")
                 button_class = await publish_button.get_attribute("class")
@@ -594,8 +601,14 @@ class TencentBaseUploader(BaseVideoUploader):
                 tencent_logger.info(_msg("🏃", "正在上传视频中..."))
                 await asyncio.sleep(2)
 
-    async def submit_publish(self, page: Page) -> None:
+    async def submit_publish(self, page: Page, timeout_seconds: int = 300) -> None:
+        start_time = time.monotonic()
         while True:
+            if time.monotonic() - start_time > timeout_seconds:
+                screenshot_path = Path(BASE_DIR) / "publish_logs" / "screenshots" / f"tencent_publish_timeout_{int(time.time())}.png"
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                await page.screenshot(path=str(screenshot_path), full_page=True)
+                raise TimeoutError(f"等待视频号发布结果超时，截图: {screenshot_path}")
             try:
                 if getattr(self, "is_draft", False):
                     draft_button = page.locator('div.form-btns button:has-text("保存草稿")')
