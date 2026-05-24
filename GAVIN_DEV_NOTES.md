@@ -25,7 +25,7 @@ WSL 路径：
 
 ## 环境启动
 
-PowerShell：
+项目已经创建 Windows 虚拟环境，发布任务请在 Windows PowerShell 里运行：
 
 ```powershell
 D:
@@ -33,12 +33,7 @@ cd D:\workspace\gavin-social-publisher
 .venv\Scripts\activate
 ```
 
-WSL：
-
-```bash
-cd /mnt/d/workspace/gavin-social-publisher
-source .venv/bin/activate
-```
+说明：不要用 WSL 的 Python 环境执行真实发布；真实发布要走 Windows Chrome。WSL 只用于改代码/查看文件。
 
 ## 已新增命令
 
