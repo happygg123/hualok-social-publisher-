@@ -569,6 +569,80 @@ class TencentBaseUploader(BaseVideoUploader):
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(800)
 
+    async def handle_original_intercept_dialog(self, page: Page) -> bool:
+        """处理点击发表时拦截页面的原创声明弹窗。"""
+        dialog = page.locator(
+            "div.original-intercept-wrapper:visible, "
+            "div.weui-desktop-dialog__wrp:visible, "
+            "div.weui-desktop-dialog:visible, "
+            "div.ant-modal:visible"
+        ).filter(has_text="原创").last
+        try:
+            if not await dialog.count():
+                return False
+        except Exception:
+            return False
+
+        tencent_logger.info(_msg("🧾", "检测到原创声明拦截弹窗，准备勾选我已阅读并声明原创"))
+
+        read_selectors = [
+            'label:has-text("我已阅读") input[type="checkbox"]',
+            'label:has-text("已阅读") input[type="checkbox"]',
+            'label:has-text("我已阅读") .ant-checkbox-input',
+            'label:has-text("已阅读") .ant-checkbox-input',
+            'div.original-intercept-wrapper input[type="checkbox"]',
+            'div.weui-desktop-dialog:visible input[type="checkbox"]',
+            'div.ant-modal:visible input[type="checkbox"]',
+            'div.original-intercept-wrapper .ant-checkbox',
+        ]
+        for selector in read_selectors:
+            checkbox = page.locator(selector).last
+            try:
+                if not await checkbox.count():
+                    continue
+                await checkbox.scroll_into_view_if_needed(timeout=1000)
+                if hasattr(checkbox, "is_checked"):
+                    try:
+                        if await checkbox.is_checked():
+                            break
+                    except Exception:
+                        pass
+                await checkbox.click(force=True, timeout=3000)
+                await page.wait_for_timeout(500)
+                tencent_logger.info(_msg("🧾", f"已勾选原创声明阅读条款: {selector}"))
+                break
+            except Exception:
+                continue
+
+        declare_selectors = [
+            'div.original-intercept-wrapper button:has-text("声明原创")',
+            'div.weui-desktop-dialog:visible button:has-text("声明原创")',
+            'div.ant-modal:visible button:has-text("声明原创")',
+            'button:has-text("声明原创"):visible',
+            'div.original-intercept-wrapper button:has-text("确定")',
+            'div.weui-desktop-dialog:visible button:has-text("确定")',
+            'div.ant-modal:visible button:has-text("确定")',
+            'div.original-intercept-wrapper button:has-text("确认")',
+        ]
+        for selector in declare_selectors:
+            button = page.locator(selector).last
+            try:
+                if not await button.count():
+                    continue
+                await button.scroll_into_view_if_needed(timeout=1000)
+                await button.click(force=True, timeout=5000)
+                await page.wait_for_timeout(1500)
+                tencent_logger.info(_msg("🧾", f"已点击原创声明按钮: {selector}"))
+                await self.dismiss_original_statement_tip(page)
+                return True
+            except Exception:
+                continue
+
+        screenshot_path = Path(BASE_DIR) / "publish_logs" / "screenshots" / f"tencent_original_intercept_unhandled_{int(time.time())}.png"
+        screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+        await page.screenshot(path=str(screenshot_path), full_page=True)
+        raise RuntimeError(f"检测到原创声明弹窗，但没有找到可点击的声明按钮，截图: {screenshot_path}")
+
     async def apply_original_statement(self, page: Page) -> None:
         if await page.get_by_label("视频为原创").count():
             await page.get_by_label("视频为原创").check()
@@ -665,7 +739,7 @@ class TencentBaseUploader(BaseVideoUploader):
                 else:
                     publish_button = page.locator('div.form-btns button:has-text("发表")')
                     if await publish_button.count():
-                        await publish_button.click()
+                        await publish_button.click(timeout=8000)
                     await page.wait_for_url(TENCENT_MANAGE_URL, timeout=5000)
                     tencent_logger.success(_msg("🥳", "视频发布成功"))
                 break
@@ -679,6 +753,9 @@ class TencentBaseUploader(BaseVideoUploader):
                     if TENCENT_MANAGE_URL in current_url:
                         tencent_logger.success(_msg("🥳", "视频发布成功"))
                         break
+                    if await self.handle_original_intercept_dialog(page):
+                        await page.wait_for_timeout(1000)
+                        continue
                 tencent_logger.exception(f"  [-] Exception: {exc}")
                 tencent_logger.info(_msg("🏃", "视频正在发布中..."))
                 await asyncio.sleep(0.5)
