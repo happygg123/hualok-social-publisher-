@@ -183,7 +183,11 @@ async def douyin_cookie_gen(
         result = _build_login_result(False, "failed", "抖音登录失败", account_file)
         try:
             page = await context.new_page()
-            await page.goto("https://creator.douyin.com/")
+            await page.goto("https://creator.douyin.com/", wait_until="domcontentloaded", timeout=90000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                douyin_logger.info(_msg("🧍", "页面仍有网络请求未结束，小人继续尝试提取登录二维码"))
             qrcode_info = await _save_douyin_qrcode(page, account_file, qrcode_callback=qrcode_callback)
             qrcode_path = Path(qrcode_info["image_path"])
             douyin_logger.info(_msg("🧍", "请扫码，小人正在耐心等待登录完成"))
