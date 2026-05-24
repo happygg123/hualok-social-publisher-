@@ -189,3 +189,15 @@ uploadFile
 videoFile
 
 /uploader/bilibili_uploader/qrcode.png
+
+# Gavin local publisher runtime artifacts
+publisher_state.sqlite3
+publisher_state.sqlite3-*
+publish_logs/
+
+# Local browser/debug helpers generated during publisher testing
+scripts/debug_tencent_post_list.py
+scripts/probe_tencent_post_list.py
+scripts/list_chrome_titles.ps1
+scripts/screenshot_chrome_pid.ps1
+scripts/screenshot_video_chrome.ps1
