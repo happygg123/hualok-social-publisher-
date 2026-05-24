@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -400,14 +401,18 @@ class XiaoHongShuBaseUploader(BaseVideoUploader):
             await desc.click()
 
         for tag in self.tags:  # 循环处理所有 tags
-            await page.keyboard.type("#" + tag, delay=30)
-            await page.locator('#creator-editor-topic-container').wait_for(
-                state="visible",
-                timeout=3000
-            )
-            first_item = page.locator('#creator-editor-topic-container .item').first
-            await first_item.wait_for(state="visible", timeout=2000)
-            await first_item.click()
+            try:
+                await page.keyboard.type("#" + tag, delay=30)
+                await page.locator('#creator-editor-topic-container').wait_for(
+                    state="visible",
+                    timeout=3000
+                )
+                first_item = page.locator('#creator-editor-topic-container .item').first
+                await first_item.wait_for(state="visible", timeout=2000)
+                await first_item.click()
+            except Exception as exc:
+                xiaohongshu_logger.warning(_msg("😵", f"小红书话题联想未出现，跳过话题 {tag}: {exc}"))
+                await page.keyboard.press("Space")
 
     async def fill_meta(self, page: Page) -> None:
         await self.fill_title(page)
@@ -461,28 +466,30 @@ class XiaoHongShuVideo(XiaoHongShuBaseUploader):
 
         xiaohongshu_logger.info(_msg("🖼️", "小人准备设置封面"))
 
-        cover_plugin_title = page.locator("div.cover-plugin-title").filter(has_text="设置封面")
-        cover_upload_dialog = cover_plugin_title.locator(
-            "xpath=ancestor::div[contains(@class, 'cover-plugin-preview')]"
-        ).locator("div.cover > div.default:visible")
-        await cover_upload_dialog.wait_for(state="visible", timeout=30000)
+        try:
+            cover_plugin_title = page.locator("div.cover-plugin-title").filter(has_text="设置封面")
+            cover_upload_dialog = cover_plugin_title.locator(
+                "xpath=ancestor::div[contains(@class, 'cover-plugin-preview')]"
+            ).locator("div.cover > div.default:visible")
+            await cover_upload_dialog.wait_for(state="visible", timeout=30000)
+            await cover_upload_dialog.click(force=True)
 
-        await cover_upload_dialog.click(force=True)
+            modal = page.locator("div.d-modal.cover-modal")
+            await modal.wait_for(state="visible", timeout=30000)
 
-        modal = page.locator("div.d-modal.cover-modal")
-        await modal.wait_for(state="visible", timeout=30000)
+            file_input = modal.locator('input[type="file"][accept*="image"]').first
+            await file_input.wait_for(state="attached", timeout=10000)
+            await file_input.set_input_files(thumbnail_path)
+            await page.wait_for_timeout(2000)
 
-        file_input = modal.locator('input[type="file"][accept*="image"]').first
-        await file_input.wait_for(state="attached", timeout=10000)
-        await file_input.set_input_files(thumbnail_path)
-        await page.wait_for_timeout(2000)
+            confirm_button = modal.locator("button.mojito-button").filter(has_text="确定").first
+            await confirm_button.wait_for(state="visible", timeout=10000)
+            await confirm_button.click()
 
-        confirm_button = modal.locator("button.mojito-button").filter(has_text="确定").first
-        await confirm_button.wait_for(state="visible", timeout=10000)
-        await confirm_button.click()
-
-        await modal.wait_for(state="hidden", timeout=30000)
-        xiaohongshu_logger.success(_msg("🥳", "封面已经设置完成"))
+            await modal.wait_for(state="hidden", timeout=30000)
+            xiaohongshu_logger.success(_msg("🥳", "封面已经设置完成"))
+        except Exception as exc:
+            xiaohongshu_logger.warning(_msg("😵", f"小红书封面设置失败，跳过自定义封面继续发布: {exc}"))
 
     async def upload_video_content(self, page: Page) -> None:
         xiaohongshu_logger.info(_msg("🏃", f"小人开始搬运视频: {self.title}.mp4"))
@@ -491,40 +498,36 @@ class XiaoHongShuVideo(XiaoHongShuBaseUploader):
         await page.wait_for_url(XHS_PUBLISH_VIDEO_URL)
         await page.locator("div[class^='upload-content'] input[class='upload-input']").set_input_files(self.file_path)
 
+        upload_start = time.monotonic()
         while True:
+            if time.monotonic() - upload_start > 1200:
+                screenshot_path = Path("publish_logs") / "screenshots" / f"xiaohongshu_upload_timeout_{int(time.time())}.png"
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                await page.screenshot(path=str(screenshot_path), full_page=True)
+                raise TimeoutError(f"等待小红书视频上传完成超时，截图: {screenshot_path}")
             try:
+                page_text = await page.locator("body").inner_text(timeout=3000)
+                if any(keyword in page_text for keyword in ["上传成功", "重新上传", "编辑封面", "封面效果评估通过"]):
+                    if not any(keyword in page_text for keyword in ["上传中", "取消上传", "剩余时间"]):
+                        xiaohongshu_logger.success(_msg("🥳", "视频已经传完啦"))
+                        break
+
                 upload_input = await page.wait_for_selector('input.upload-input', timeout=3000)
                 preview_new = await upload_input.query_selector(
                     'xpath=following-sibling::div[contains(@class, "preview-new")]')
                 if preview_new:
-                    # 获取整个预览区域的文本，更鲁棒地判断上传状态
                     all_text = await preview_new.inner_text()
                     upload_success = any(keyword in all_text for keyword in ['上传成功', '分辨率', '重新上传', '编辑封面', '已上传', '已选择', '100%'])
-                    
-                    if not upload_success:
-                        # 检查是否有特定的状态码或百分比
-                        stage_elements = await preview_new.query_selector_all('div.stage')
-                        for stage in stage_elements:
-                            text_content = await page.evaluate('(element) => element.textContent', stage)
-                            if '上传成功' in text_content or '分辨率' in text_content:
-                                upload_success = True
-                                break
-                    
-                    if upload_success:
+                    uploading = any(keyword in all_text for keyword in ['上传中', '取消上传', '剩余时间'])
+                    if upload_success and not uploading:
                         xiaohongshu_logger.success(_msg("🥳", "视频已经传完啦"))
                         break
-                    
                     if self.debug:
                         preview_text = all_text.strip().replace("\n", " ")
                         xiaohongshu_logger.debug(_msg("🧍", f"预览区域内容: {preview_text}"))
-                    xiaohongshu_logger.debug(_msg("🧍", "还没看到上传成功标识，小人继续等一会"))
+                    xiaohongshu_logger.debug(_msg("🧍", "还没看到上传完成，小人继续等一会"))
                 else:
-                    # 尝试检查标题输入框是否已经出现，如果是，说明已经进入编辑状态
-                    title_container = page.locator('input[placeholder*="填写标题"]')
-                    if await title_container.count() > 0 and await title_container.is_visible():
-                        xiaohongshu_logger.success(_msg("🥳", "虽然没看到预览区，但标题框出来了，小人继续"))
-                        break
-                    xiaohongshu_logger.debug(_msg("🧍", "还没拿到预览区域，小人继续等一会"))
+                    xiaohongshu_logger.debug(_msg("🧍", "还没拿到预览区域，小人继续等上传完成"))
             except Exception as e:
                 xiaohongshu_logger.debug(_msg("😵", f"上传状态还没稳定下来，小人继续观察: {e}"))
             await asyncio.sleep(2)
@@ -539,23 +542,30 @@ class XiaoHongShuVideo(XiaoHongShuBaseUploader):
         if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time_xiaohongshu(page, self.publish_date)
 
+        publish_start = time.monotonic()
         while True:
+            if time.monotonic() - publish_start > 180:
+                screenshot_path = Path("publish_logs") / "screenshots" / f"xiaohongshu_publish_timeout_{int(time.time())}.png"
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                await page.screenshot(path=str(screenshot_path), full_page=True)
+                raise TimeoutError(f"等待小红书发布结果超时，截图: {screenshot_path}")
             try:
                 if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED:
-                    await page.locator('button:has-text("定时发布")').click()
+                    await page.locator('button:has-text("定时发布")').click(timeout=5000)
                 else:
-                    await page.locator('button:has-text("发布")').click()
+                    await page.locator('button:has-text("发布")').click(timeout=5000)
                 await page.wait_for_url(
-                    "https://creator.xiaohongshu.com/publish/success?**",
-                    timeout=3000
+                    XHS_PUBLISH_SUCCESS_URL_PATTERN,
+                    timeout=5000
                 )
                 xiaohongshu_logger.success(_msg("🥳", "视频发布成功，小人开心收工"))
                 break
-            except Exception:
-                xiaohongshu_logger.info(_msg("🏃", "小人正在冲刺发布视频"))
-                if self.debug:
-                    await page.screenshot(full_page=True)
-                await asyncio.sleep(0.5)
+            except Exception as exc:
+                if "publish/success" in page.url:
+                    xiaohongshu_logger.success(_msg("🥳", "视频发布成功，小人开心收工"))
+                    break
+                xiaohongshu_logger.info(_msg("🏃", f"小人正在冲刺发布视频: {exc}"))
+                await asyncio.sleep(1)
 
     async def upload(self, playwright: Playwright) -> None:
         xiaohongshu_logger.info(_msg("🧍", "小人先检查 cookie、视频文件、封面和发布时间"))
