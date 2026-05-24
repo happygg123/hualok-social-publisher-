@@ -537,9 +537,42 @@ class TencentBaseUploader(BaseVideoUploader):
             await page.get_by_text("添加到合集").locator("xpath=following-sibling::div").click()
             await collection_elements.first.click()
 
+    async def dismiss_original_statement_tip(self, page: Page) -> None:
+        tip_dialog = page.locator("div.weui-desktop-dialog:visible, div.ant-modal:visible").filter(has_text="声明原创的视频").first
+        if not await tip_dialog.count():
+            return
+
+        tencent_logger.info(_msg("🧾", "检测到声明原创提示弹窗，准备处理"))
+        button_selectors = [
+            'div.weui-desktop-dialog:visible button:has-text("我知道了")',
+            'div.weui-desktop-dialog:visible button:has-text("知道了")',
+            'div.weui-desktop-dialog:visible button:has-text("确定")',
+            'div.weui-desktop-dialog:visible button:has-text("确认")',
+            'div.ant-modal:visible button:has-text("我知道了")',
+            'div.ant-modal:visible button:has-text("知道了")',
+            'div.ant-modal:visible button:has-text("确定")',
+            'div.ant-modal:visible button:has-text("确认")',
+            'div.weui-desktop-dialog:visible .weui-desktop-dialog__close',
+            'div.ant-modal:visible .ant-modal-close',
+        ]
+        for selector in button_selectors:
+            button = page.locator(selector).last
+            try:
+                if await button.count():
+                    await button.click()
+                    await page.wait_for_timeout(800)
+                    tencent_logger.info(_msg("🧾", f"已关闭声明原创提示弹窗: {selector}"))
+                    return
+            except Exception:
+                continue
+
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(800)
+
     async def apply_original_statement(self, page: Page) -> None:
         if await page.get_by_label("视频为原创").count():
             await page.get_by_label("视频为原创").check()
+            await self.dismiss_original_statement_tip(page)
 
         try:
             label_locator = await page.locator('label:has-text("我已阅读并同意 《视频号原创声明使用条款》")').is_visible()
@@ -548,31 +581,44 @@ class TencentBaseUploader(BaseVideoUploader):
 
         if label_locator:
             await page.get_by_label("我已阅读并同意 《视频号原创声明使用条款》").check()
-            await page.get_by_role("button", name="声明原创").click()
+            declare_now_button = page.get_by_role("button", name="声明原创")
+            if await declare_now_button.count():
+                await declare_now_button.click()
+                await self.dismiss_original_statement_tip(page)
 
-        if await page.locator('div.label span:has-text("声明原创")').count() and getattr(self, "category", None):
-            if not await page.locator("div.declare-original-checkbox input.ant-checkbox-input").is_disabled():
-                await page.locator("div.declare-original-checkbox input.ant-checkbox-input").click()
+        if await page.locator('div.label span:has-text("声明原创")').count():
+            original_checkbox = page.locator("div.declare-original-checkbox input.ant-checkbox-input").first
+            try:
+                if await original_checkbox.count() and not await original_checkbox.is_disabled():
+                    await original_checkbox.click()
+                    await self.dismiss_original_statement_tip(page)
+            except Exception:
+                pass
+
+            if getattr(self, "category", None):
                 checked_locator = page.locator(
                     "div.declare-original-dialog "
                     "label.ant-checkbox-wrapper.ant-checkbox-wrapper-checked:visible"
                 )
                 if not await checked_locator.count():
-                    await page.locator("div.declare-original-dialog input.ant-checkbox-input:visible").click()
+                    checkbox = page.locator("div.declare-original-dialog input.ant-checkbox-input:visible").first
+                    if await checkbox.count():
+                        await checkbox.click()
 
-            original_type_form = page.locator('div.original-type-form > div.form-label:has-text("原创类型"):visible')
-            if await original_type_form.count():
-                await page.locator("div.form-content:visible").click()
-                await page.locator(
-                    "div.form-content:visible "
-                    "ul.weui-desktop-dropdown__list "
-                    f'li.weui-desktop-dropdown__list-ele:has-text("{self.category}")'
-                ).first.click()
-                await page.wait_for_timeout(1000)
+                original_type_form = page.locator('div.original-type-form > div.form-label:has-text("原创类型"):visible')
+                if await original_type_form.count():
+                    await page.locator("div.form-content:visible").click()
+                    await page.locator(
+                        "div.form-content:visible "
+                        "ul.weui-desktop-dropdown__list "
+                        f'li.weui-desktop-dropdown__list-ele:has-text("{self.category}")'
+                    ).first.click()
+                    await page.wait_for_timeout(1000)
 
-            declare_button = page.locator('button:has-text("声明原创"):visible')
+            declare_button = page.locator('button:has-text("声明原创"):visible').last
             if await declare_button.count():
                 await declare_button.click()
+                await self.dismiss_original_statement_tip(page)
 
     async def wait_for_upload_complete(self, page: Page, timeout_seconds: int = 900) -> None:
         start_time = time.monotonic()
