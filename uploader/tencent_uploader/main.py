@@ -570,7 +570,7 @@ class TencentBaseUploader(BaseVideoUploader):
         await page.wait_for_timeout(800)
 
     async def handle_original_intercept_dialog(self, page: Page) -> bool:
-        """处理点击发表时拦截页面的原创声明弹窗。"""
+        """处理点击发表时出现的原创权益弹窗：默认取消原创，不做硬点声明。"""
         dialog = page.locator(
             "div.original-intercept-wrapper:visible, "
             "div.weui-desktop-dialog__wrp:visible, "
@@ -583,65 +583,30 @@ class TencentBaseUploader(BaseVideoUploader):
         except Exception:
             return False
 
-        tencent_logger.info(_msg("🧾", "检测到原创声明拦截弹窗，准备勾选我已阅读并声明原创"))
-
-        read_selectors = [
-            'label:has-text("我已阅读") input[type="checkbox"]',
-            'label:has-text("已阅读") input[type="checkbox"]',
-            'label:has-text("我已阅读") .ant-checkbox-input',
-            'label:has-text("已阅读") .ant-checkbox-input',
-            'div.original-intercept-wrapper input[type="checkbox"]',
-            'div.weui-desktop-dialog:visible input[type="checkbox"]',
-            'div.ant-modal:visible input[type="checkbox"]',
-            'div.original-intercept-wrapper .ant-checkbox',
+        tencent_logger.info(_msg("🧾", "检测到原创权益弹窗，默认取消原创声明，继续普通发布"))
+        cancel_selectors = [
+            'div.original-intercept-wrapper button:has-text("取消")',
+            'div.weui-desktop-dialog:visible button:has-text("取消")',
+            'div.ant-modal:visible button:has-text("取消")',
+            'div.original-intercept-wrapper .weui-desktop-dialog__close',
+            'div.weui-desktop-dialog:visible .weui-desktop-dialog__close',
+            'div.ant-modal:visible .ant-modal-close',
         ]
-        for selector in read_selectors:
-            checkbox = page.locator(selector).last
-            try:
-                if not await checkbox.count():
-                    continue
-                await checkbox.scroll_into_view_if_needed(timeout=1000)
-                if hasattr(checkbox, "is_checked"):
-                    try:
-                        if await checkbox.is_checked():
-                            break
-                    except Exception:
-                        pass
-                await checkbox.click(force=True, timeout=3000)
-                await page.wait_for_timeout(500)
-                tencent_logger.info(_msg("🧾", f"已勾选原创声明阅读条款: {selector}"))
-                break
-            except Exception:
-                continue
-
-        declare_selectors = [
-            'div.original-intercept-wrapper button:has-text("声明原创")',
-            'div.weui-desktop-dialog:visible button:has-text("声明原创")',
-            'div.ant-modal:visible button:has-text("声明原创")',
-            'button:has-text("声明原创"):visible',
-            'div.original-intercept-wrapper button:has-text("确定")',
-            'div.weui-desktop-dialog:visible button:has-text("确定")',
-            'div.ant-modal:visible button:has-text("确定")',
-            'div.original-intercept-wrapper button:has-text("确认")',
-        ]
-        for selector in declare_selectors:
+        for selector in cancel_selectors:
             button = page.locator(selector).last
             try:
                 if not await button.count():
                     continue
-                await button.scroll_into_view_if_needed(timeout=1000)
-                await button.click(force=True, timeout=5000)
-                await page.wait_for_timeout(1500)
-                tencent_logger.info(_msg("🧾", f"已点击原创声明按钮: {selector}"))
-                await self.dismiss_original_statement_tip(page)
+                await button.click(timeout=5000)
+                await page.wait_for_timeout(1000)
+                tencent_logger.info(_msg("🧾", f"已关闭原创权益弹窗: {selector}"))
                 return True
             except Exception:
                 continue
 
-        screenshot_path = Path(BASE_DIR) / "publish_logs" / "screenshots" / f"tencent_original_intercept_unhandled_{int(time.time())}.png"
-        screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-        await page.screenshot(path=str(screenshot_path), full_page=True)
-        raise RuntimeError(f"检测到原创声明弹窗，但没有找到可点击的声明按钮，截图: {screenshot_path}")
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(1000)
+        return True
 
     async def apply_original_statement(self, page: Page) -> None:
         if await page.get_by_label("视频为原创").count():
@@ -915,7 +880,9 @@ class TencentVideo(TencentBaseUploader):
         await self.fill_title_and_tags(page)
         await self.fill_description(page)
         await self.apply_collection(page)
-        await self.apply_original_statement(page)
+        # 默认不走“声明原创”。该弹窗是视频号当前最不稳定的拦截点，
+        # 批量发布优先保证稳定提交；如以后确实需要原创，再做显式开关。
+        tencent_logger.info(_msg("🧾", "默认跳过声明原创，避免原创权益弹窗拦截批量发布"))
 
     async def upload(self, playwright: Playwright) -> None:
         tencent_logger.info(_msg("🧍", "小人先检查 cookie、视频文件和发布时间"))
