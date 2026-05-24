@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from publisher_db import create_job, get_job, init_db, list_attempts, list_jobs
+from publisher_db import cancel_job, create_job, get_job, init_db, list_attempts, list_jobs, queue_job
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -67,10 +67,12 @@ class Handler(BaseHTTPRequestHandler):
                 rows.append(
                     f"<tr><td>{job['id']}</td><td><a href='/job?id={job['id']}'>{esc(job['title'])}</a><div class='muted'>{esc(job['video'])}</div></td>"
                     f"<td>{esc(job['platforms'])}</td><td>{esc(job['schedule_time']) or '立即'}</td>"
-                    f"<td class='status-{status}'>{status}</td><td>{esc(job['last_error'])}</td></tr>"
+                    f"<td class='status-{status}'>{status}</td><td>{esc(job['last_error'])}</td>"
+                    f"<td><form method='post' action='/run' style='display:inline'><input type='hidden' name='id' value='{job['id']}'><button type='submit'>立即执行</button></form> "
+                    f"<form method='post' action='/cancel' style='display:inline'><input type='hidden' name='id' value='{job['id']}'><button type='submit' style='background:#777'>取消</button></form></td></tr>"
                 )
-            body = "<div class='card'><h2>发布任务</h2><p>本页显示一次设置、多平台分发任务。</p></div>"
-            body += "<table><tr><th>ID</th><th>标题/视频</th><th>平台</th><th>发布时间</th><th>状态</th><th>错误</th></tr>" + "".join(rows) + "</table>"
+            body = "<div class='card'><h2>发布任务</h2><p>本页显示一次设置、多平台分发任务。worker 每 30 秒执行到期任务。</p></div>"
+            body += "<table><tr><th>ID</th><th>标题/视频</th><th>平台</th><th>发布时间</th><th>状态</th><th>错误</th><th>操作</th></tr>" + "".join(rows) + "</table>"
             self.send_html("发布任务", body)
             return
         if parsed.path == "/new":
@@ -100,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_html("未找到", "<div class='card'>任务不存在</div>", 404)
                 return
             attempts = list_attempts(job_id)
-            body = f"<div class='card'><h2>{esc(job['title'])}</h2><p><b>状态：</b>{esc(job['status'])}</p><p><b>视频：</b><code>{esc(job['video'])}</code></p><p><b>封面：</b><code>{esc(job['cover'])}</code></p><p><b>平台：</b>{esc(job['platforms'])}</p><p><b>定时：</b>{esc(job['schedule_time']) or '立即'}</p><p><b>错误：</b>{esc(job['last_error'])}</p></div>"
+            body = f"<div class='card'><h2>{esc(job['title'])}</h2><p><b>状态：</b>{esc(job['status'])}</p><p><b>视频：</b><code>{esc(job['video'])}</code></p><p><b>封面：</b><code>{esc(job['cover'])}</code></p><p><b>平台：</b>{esc(job['platforms'])}</p><p><b>定时：</b>{esc(job['schedule_time']) or '立即'}</p><p><b>错误：</b>{esc(job['last_error'])}</p><form method='post' action='/run' style='display:inline'><input type='hidden' name='id' value='{job_id}'><button type='submit'>立即执行/重试</button></form> <form method='post' action='/cancel' style='display:inline'><input type='hidden' name='id' value='{job_id}'><button type='submit' style='background:#777'>取消任务</button></form></div>"
             body += "<div class='card'><h3>平台执行记录</h3><table><tr><th>平台</th><th>状态</th><th>时间</th><th>错误</th></tr>"
             for item in attempts:
                 body += f"<tr><td>{esc(item['platform'])}</td><td>{esc(item['status'])}</td><td>{esc(item['finished_at'])}</td><td><pre>{esc(item['stderr'][-1000:])}</pre></td></tr>"
@@ -112,6 +114,24 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         init_db()
         parsed = urlparse(self.path)
+        if parsed.path == "/run":
+            length = int(self.headers.get("Content-Length", "0"))
+            data = parse_qs(self.rfile.read(length).decode("utf-8"))
+            job_id = int((data.get("id") or ["0"])[0])
+            queue_job(job_id, schedule_time="")
+            self.send_response(303)
+            self.send_header("Location", f"/job?id={job_id}")
+            self.end_headers()
+            return
+        if parsed.path == "/cancel":
+            length = int(self.headers.get("Content-Length", "0"))
+            data = parse_qs(self.rfile.read(length).decode("utf-8"))
+            job_id = int((data.get("id") or ["0"])[0])
+            cancel_job(job_id)
+            self.send_response(303)
+            self.send_header("Location", f"/job?id={job_id}")
+            self.end_headers()
+            return
         if parsed.path != "/create":
             self.send_html("404", "<div class='card'>Not found</div>", 404)
             return

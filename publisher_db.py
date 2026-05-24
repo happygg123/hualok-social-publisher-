@@ -135,6 +135,22 @@ def set_job_status(job_id: int, status: str, last_error: str = "", db_path: Path
         )
 
 
+def queue_job(job_id: int, schedule_time: str = "", db_path: Path | str = DB_PATH) -> None:
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE publish_jobs
+            SET status = 'queued', schedule_time = ?, last_error = '', updated_at = ?
+            WHERE id = ?
+            """,
+            (schedule_time, now_str(), job_id),
+        )
+
+
+def cancel_job(job_id: int, db_path: Path | str = DB_PATH) -> None:
+    set_job_status(job_id, "cancelled", db_path=db_path)
+
+
 def due_jobs(db_path: Path | str = DB_PATH) -> list[dict[str, Any]]:
     init_db(db_path)
     now = now_str()
