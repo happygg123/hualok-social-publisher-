@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 from publisher_db import cancel_job, create_job, get_job, init_db, list_attempts, list_jobs, queue_job
+from app.publisher_engines.multipost_payload import build_multipost_video_payload
 from app.web.view_models import build_dashboard_context, build_job_detail_context
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -94,3 +95,25 @@ def serve_file(path: str):
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(file_path)
+
+
+@app.get("/media/job/{job_id}/{asset}")
+def serve_job_media(job_id: int, asset: str):
+    if asset not in {"video", "cover"}:
+        raise HTTPException(status_code=404, detail="不支持的素材类型")
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    file_path = Path(job.get(asset) or "")
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="素材文件不存在")
+    return FileResponse(file_path)
+
+
+@app.get("/api/jobs/{job_id}/multipost-payload")
+def multipost_payload(request: Request, job_id: int):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    base_url = str(request.base_url).rstrip("/")
+    return build_multipost_video_payload(job, base_url=base_url)
