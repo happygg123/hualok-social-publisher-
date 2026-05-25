@@ -22,6 +22,14 @@ from utils.log import douyin_logger
 
 DOUYIN_PUBLISH_STRATEGY_IMMEDIATE = "immediate"
 DOUYIN_PUBLISH_STRATEGY_SCHEDULED = "scheduled"
+DOUYIN_SCHEDULE_TOGGLE_SELECTORS = [
+    "[class^='radio']:has-text('定时发布')",
+    'label:has-text("定时发布")',
+]
+DOUYIN_SCHEDULE_INPUT_SELECTORS = [
+    '.semi-input[placeholder="日期和时间"]',
+    'input[format="yyyy-MM-dd HH:mm"]',
+]
 
 
 def _msg(emoji: str, text: str) -> str:
@@ -254,13 +262,24 @@ class DouYinBaseUploader(BaseVideoUploader):
             self.publish_date = 0
 
     async def set_schedule_time_douyin(self, page, publish_date):
-        label_element = page.locator("[class^='radio']:has-text('定时发布')")
-        await label_element.click()
+        for selector in DOUYIN_SCHEDULE_TOGGLE_SELECTORS:
+            label_element = page.locator(selector).first
+            if await label_element.count():
+                await label_element.click()
+                break
+        else:
+            raise RuntimeError("未找到抖音定时发布开关")
         await asyncio.sleep(1)
         publish_date_hour = publish_date.strftime("%Y-%m-%d %H:%M")
 
         await asyncio.sleep(1)
-        await page.locator('.semi-input[placeholder="日期和时间"]').click()
+        for selector in DOUYIN_SCHEDULE_INPUT_SELECTORS:
+            time_input = page.locator(selector).first
+            if await time_input.count():
+                await time_input.click()
+                break
+        else:
+            raise RuntimeError("未找到抖音定时发布时间输入框")
         await page.keyboard.press("Control+KeyA")
         await page.keyboard.type(str(publish_date_hour))
         await page.keyboard.press("Enter")

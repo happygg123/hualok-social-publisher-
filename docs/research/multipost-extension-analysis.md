@@ -321,15 +321,15 @@ Not recommended. We would lose HuaLok queue/database/logging and still need to r
 - [ ] Add fallback title selector `input[placeholder*="作品标题"]`.
 - [ ] Add editor selector `div.zone-container...contenteditable="true"`.
 - [ ] Add cover selector `input[type="file"].semi-upload-hidden-input`.
-- [ ] Verify scheduled field `input[format="yyyy-MM-dd HH:mm"]`.
+- [x] Add scheduled field fallback `input[format="yyyy-MM-dd HH:mm"]`.
 
 ### 小红书
 
 - [ ] Add tag Enter confirmation after paste.
 - [ ] Add cover selector `div.noCover.uploadCover`.
 - [ ] Add cover input selector `input[accept='image/png, image/jpeg, image/*']`.
-- [ ] Verify scheduled field `input[placeholder="选择日期和时间"]`.
-- [ ] Do not copy `+8h` blindly.
+- [x] Add scheduled field fallback `input[placeholder="选择日期和时间"]`.
+- [x] Do not copy `+8h` blindly; HuaLok keeps China-local schedule time unchanged.
 
 ## Decision
 

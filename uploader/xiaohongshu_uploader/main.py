@@ -30,6 +30,14 @@ XHS_LOGIN_BOX_SELECTOR = "div[class*='login-box']"
 XHS_LOGIN_SWITCH_SELECTOR = "img.css-wemwzq"
 XIAOHONGSHU_PUBLISH_STRATEGY_IMMEDIATE = "immediate"
 XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED = "scheduled"
+XHS_SCHEDULE_TOGGLE_SELECTORS = [
+    '.custom-switch-card:has-text("定时发布") .d-switch',
+    'label:has-text("定时发布")',
+]
+XHS_SCHEDULE_INPUT_SELECTORS = [
+    '.d-datepicker-input-filter input.d-text',
+    'input[placeholder="选择日期和时间"]',
+]
 
 
 def _msg(emoji: str, text: str) -> str:
@@ -310,10 +318,21 @@ class XiaoHongShuBaseUploader(BaseVideoUploader):
 
     async def set_schedule_time_xiaohongshu(self, page: Page, publish_date: datetime):
         xiaohongshu_logger.info(_msg("🕒", f"小人准备设置定时发布时间: {publish_date.strftime(self.date_format)}"))
-        await page.locator('.custom-switch-card').filter(has_text="定时发布").locator('.d-switch').click()
+        for selector in XHS_SCHEDULE_TOGGLE_SELECTORS:
+            toggle = page.locator(selector).first
+            if await toggle.count():
+                await toggle.click()
+                break
+        else:
+            raise RuntimeError("未找到小红书定时发布开关")
         await asyncio.sleep(1)
         publish_date_hour = publish_date.strftime("%Y-%m-%d %H:%M")
-        time_input = page.locator('.d-datepicker-input-filter input.d-text')
+        for selector in XHS_SCHEDULE_INPUT_SELECTORS:
+            time_input = page.locator(selector).first
+            if await time_input.count():
+                break
+        else:
+            raise RuntimeError("未找到小红书定时发布时间输入框")
         await time_input.fill(str(publish_date_hour))
         await asyncio.sleep(1)
 
