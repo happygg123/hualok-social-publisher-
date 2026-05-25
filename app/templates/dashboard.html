@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}发布任务中控台 - HuaLok{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="eyebrow">Platform Scheduler</div>
+    <h1>发布任务中控台</h1>
+    <div class="subtitle">一次配置，多平台分发；任务会立即上传，并把定时时间写入平台后台。</div>
+  </div>
+  <div class="btn-row"><a class="btn btn-primary" href="/new">新建发布任务</a></div>
+</div>
+
+<div class="grid-stats">
+  <div class="stat"><div class="num">{{ counts.total }}</div><div class="label">全部任务</div></div>
+  <div class="stat"><div class="num">{{ counts.queued }}</div><div class="label">待上传</div></div>
+  <div class="stat"><div class="num">{{ counts.running }}</div><div class="label">上传中</div></div>
+  <div class="stat"><div class="num">{{ counts.success }}</div><div class="label">成功</div></div>
+  <div class="stat"><div class="num">{{ counts.failed + counts.partial_success }}</div><div class="label">失败/部分</div></div>
+</div>
+
+<section class="card card-pad">
+  <div class="toolbar">
+    <h2>任务队列</h2>
+    <div class="filters">
+      {% for key, label in filters %}
+        <a class="chip {% if key == active_filter %}active{% endif %}" href="/?status={{ key }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="job-list">
+    {% for job in jobs %}
+    <article class="job-card">
+      <div class="job-id">#{{ job.id }}</div>
+      <div>
+        <a class="job-title" href="/job/{{ job.id }}">{{ job.title }}</a>
+        <div class="job-meta"><span class="path">{{ job.video_view }}</span></div>
+      </div>
+      <div>
+        {% for platform in job.platform_items %}<span class="platform-pill">{{ platform.label }}</span>{% endfor %}
+      </div>
+      <div>
+        <span class="badge badge-{{ job.status_view.css }}"><span>{{ job.status_view.icon }}</span>{{ job.status_view.label }}</span>
+        <div class="muted mt-7">{{ job.schedule_view }}</div>
+      </div>
+      <div>
+        <div class="btn-row">
+          <form method="post" action="/job/{{ job.id }}/run"><button class="btn-primary" type="submit">立即上传</button></form>
+          <form method="post" action="/job/{{ job.id }}/cancel"><button class="btn-danger" type="submit">取消</button></form>
+        </div>
+        <div class="muted">{% if job.error_view %}错误：{{ job.error_view }}{% else %}无错误{% endif %}</div>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty">
+      <h2>还没有发布任务</h2>
+      <p>点击“新建发布任务”，把视频、封面、标题和平台一次性配置好。</p>
+      <div class="btn-row center"><a class="btn btn-primary" href="/new">新建发布任务</a><span class="chip">支持：视频号 / 抖音 / 小红书</span><span class="chip">平台定时 + 失败重试</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}任务详情 - HuaLok{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="eyebrow">Job #{{ job.id }}</div>
+    <h1>{{ job.title }}</h1>
+    <div class="subtitle"><span class="badge badge-{{ job.status_view.css }}"><span>{{ job.status_view.icon }}</span>{{ job.status_view.label }}</span></div>
+  </div>
+  <div class="btn-row">
+    <a class="btn" href="/">返回</a>
+    <form method="post" action="/job/{{ job.id }}/run"><button class="btn-primary" type="submit">立即上传 / 重试</button></form>
+    <form method="post" action="/job/{{ job.id }}/cancel"><button class="btn-danger" type="submit">取消任务</button></form>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <section class="card card-pad">
+    <h2>任务信息</h2>
+    <div class="kv"><div class="k">视频</div><div class="v"><span class="path">{{ job.video_view }}</span></div></div>
+    <div class="kv"><div class="k">封面</div><div class="v"><span class="path">{{ job.cover_view or '未设置' }}</span></div></div>
+    <div class="kv"><div class="k">平台</div><div class="v">{% for platform in job.platform_items %}<span class="platform-pill">{{ platform.label }}</span>{% endfor %}</div></div>
+    <div class="kv"><div class="k">平台定时</div><div class="v">{{ job.schedule_view }}</div></div>
+    <div class="kv"><div class="k">标签</div><div class="v">{{ job.tags or '未设置' }}</div></div>
+    <div class="kv"><div class="k">短标题</div><div class="v">{{ job.short_title or '未设置' }}</div></div>
+    <div class="kv"><div class="k">原创声明</div><div class="v">{{ '启用' if job.tencent_declare_original else '关闭' }}</div></div>
+    <div class="kv"><div class="k">错误</div><div class="v">{{ job.last_error or '无' }}</div></div>
+  </section>
+
+  <section class="card card-pad">
+    <h2>失败截图</h2>
+    <div class="screens">
+      {% for shot in screenshots %}
+        <a class="shot" href="{{ shot.url }}" target="_blank"><img src="{{ shot.url }}"><div>{{ shot.name }}</div></a>
+      {% else %}
+        <div class="muted">暂无截图记录</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<section class="card card-pad mt-16">
+  <h2>平台执行记录</h2>
+  {% for item in attempts %}
+    <div class="attempt">
+      <div class="attempt-head"><div>{% for platform in item.platform_items %}<span class="platform-pill">{{ platform.label }}</span>{% endfor %}</div><span class="badge badge-{{ item.status_view.css }}"><span>{{ item.status_view.icon }}</span>{{ item.status_view.label }}</span></div>
+      <div class="muted">开始：{{ item.started_at }}　完成：{{ item.finished_at }}</div>
+      <details open><summary>错误 / stderr</summary><pre>{{ item.stderr_tail }}</pre></details>
+      <details><summary>输出 / stdout</summary><pre>{{ item.stdout_tail }}</pre></details>
+      <details><summary>执行命令</summary><pre>{{ item.command }}</pre></details>
+    </div>
+  {% else %}
+    <div class="empty">还没有执行记录。</div>
+  {% endfor %}
+</section>
+{% endblock %}

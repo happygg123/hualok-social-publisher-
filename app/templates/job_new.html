@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}新建任务 - HuaLok{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="eyebrow">Create Job</div>
+    <h1>新建发布任务</h1>
+    <div class="subtitle">填写一次素材和文案，保存后立即进入上传队列；定时时间会写入平台后台。</div>
+  </div>
+  <div class="btn-row"><a class="btn" href="/">返回任务列表</a></div>
+</div>
+
+<section class="card card-pad">
+  <form method="post" action="/create" class="form-grid">
+    <div><label>账号</label><input name="account" value="hualok"></div>
+    <div><label>平台</label><input name="platforms" value="tencent,douyin,xiaohongshu" required><div class="hint">可选：tencent,douyin,xiaohongshu</div></div>
+    <div class="form-full"><label>视频路径</label><input name="video" placeholder="D:\下载\hermes视频素材\xxx.mp4" required></div>
+    <div class="form-full"><label>封面路径</label><input name="cover" placeholder="D:\下载\hermes视频素材\cover.png"></div>
+    <div class="form-full"><label>标题</label><input name="title" required placeholder="输入主标题"></div>
+    <div class="form-full"><label>简介</label><textarea name="desc" placeholder="发布简介 / 正文"></textarea></div>
+    <div><label>标签</label><input name="tags" placeholder="采购,工厂,供应链"></div>
+    <div><label>平台定时发布时间</label><input name="schedule_time" placeholder="YYYY-MM-DD HH:MM:SS，空=立即发布"><div class="hint">这里是平台后台的定时发布时间，不是本地电脑到点才上传。</div></div>
+    <div><label>视频号短标题</label><input name="short_title" placeholder="视频号专用短标题"></div>
+    <div class="check-row"><label><input type="checkbox" name="tencent_declare_original" value="1">视频号发布后尝试后台原创声明</label></div>
+    <div class="form-full btn-row"><button class="btn-primary" type="submit">保存到上传队列</button><a class="btn" href="/">取消</a></div>
+  </form>
+</section>
+{% endblock %}

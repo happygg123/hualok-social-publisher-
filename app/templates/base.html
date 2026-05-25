@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}HuaLok Publisher{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/">
+        <div class="logo">H</div>
+        <div><div class="brand-title">HuaLok Publisher</div><div class="brand-sub">视频号 / 抖音 / 小红书</div></div>
+      </a>
+      <nav class="nav">
+        <a class="{% if request.url.path == '/' %}active{% endif %}" href="/">⌘ 发布任务</a>
+        <a class="{% if request.url.path == '/new' %}active{% endif %}" href="/new">＋ 新建任务</a>
+      </nav>
+      <div class="side-card">统一管理多平台发布任务；支持立即上传、平台后台定时发布、失败重试和执行记录。</div>
+    </aside>
+    <main class="main">{% block content %}{% endblock %}</main>
+  </div>
+</body>
+</html>
