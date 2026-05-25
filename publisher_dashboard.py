@@ -170,7 +170,7 @@ def page(title: str, body: str) -> bytes:
     <aside class="sidebar">
       <div class="brand"><div class="logo">H</div><div><div class="brand-title">HuaLok Publisher</div><div class="brand-sub">视频号 / 抖音 / 小红书</div></div></div>
       <nav class="nav"><a class="active" href="/">⌘ 发布任务</a><a href="/new">＋ 新建任务</a></nav>
-      <div class="side-card">本地可视化发布中控台。worker 每 30 秒扫描一次，到点自动发布；也可手动立即执行或失败重试。</div>
+      <div class="side-card">统一管理多平台发布任务；支持立即上传、平台后台定时发布、失败重试和执行记录。</div>
     </aside>
     <main class="main">{body}</main>
   </div>
@@ -230,7 +230,7 @@ def dashboard_body(jobs: list[dict], active_filter: str = "all") -> str:
     """
     return f"""
       <div class='topbar'>
-        <div><div class='eyebrow'>Local Scheduler</div><h1>发布任务中控台</h1><div class='subtitle'>一次配置，多平台分发；支持定时、立即执行、失败重试和执行记录追踪。</div></div>
+        <div><div class='eyebrow'>Platform Scheduler</div><h1>发布任务中控台</h1><div class='subtitle'>一次配置，多平台分发；任务会立即上传，并把定时时间写入平台后台。</div></div>
         <div class='btn-row'><a class='btn btn-primary' href='/new'>新建发布任务</a></div>
       </div>
       <div class='grid-stats'>{stat_html}</div>
@@ -256,7 +256,7 @@ def new_job_body() -> str:
           <div class='form-full'><label>标题</label><input name='title' required placeholder='输入主标题'></div>
           <div class='form-full'><label>简介</label><textarea name='desc' placeholder='发布简介 / 正文'></textarea></div>
           <div><label>标签</label><input name='tags' placeholder='采购,工厂,供应链'></div>
-          <div><label>定时发布时间</label><input name='schedule_time' placeholder='YYYY-MM-DD HH:MM:SS，空=立即'></div>
+          <div><label>平台定时发布时间</label><input name='schedule_time' placeholder='YYYY-MM-DD HH:MM:SS，空=立即发布'><div class='hint'>这里是平台后台的定时发布时间，不是本地电脑到点才上传。</div></div>
           <div><label>视频号短标题</label><input name='short_title' placeholder='视频号专用短标题'></div>
           <div style='display:flex;align-items:end'><label style='margin:0'><input type='checkbox' name='tencent_declare_original' value='1' style='width:auto;margin-right:8px'>视频号发布后尝试后台原创声明</label></div>
           <div class='form-full btn-row'><button class='btn-primary' type='submit'>保存到任务队列</button><a class='btn' href='/'>取消</a></div>

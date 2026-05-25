@@ -153,16 +153,13 @@ def cancel_job(job_id: int, db_path: Path | str = DB_PATH) -> None:
 
 def due_jobs(db_path: Path | str = DB_PATH) -> list[dict[str, Any]]:
     init_db(db_path)
-    now = now_str()
     with connect(db_path) as conn:
         rows = conn.execute(
             """
             SELECT * FROM publish_jobs
             WHERE status = 'queued'
-              AND (schedule_time = '' OR schedule_time <= ?)
             ORDER BY id ASC
             """,
-            (now,),
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -198,6 +195,6 @@ def job_to_master_row(job: dict[str, Any]) -> dict[str, str]:
         "desc": job.get("desc", ""),
         "tags": job.get("tags", ""),
         "platforms": job.get("platforms", ""),
-        "publish_time": "",
+        "publish_time": job.get("schedule_time", ""),
         "short_title": job.get("short_title", ""),
     }

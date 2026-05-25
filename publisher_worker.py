@@ -36,7 +36,7 @@ def run_job(job_id: int, headed: bool = True, timeout_seconds: int = 1800) -> di
 
 def run_loop(interval_seconds: int, headed: bool, timeout_seconds: int) -> None:
     init_db()
-    print(f"worker started, interval={interval_seconds}s", flush=True)
+    print(f"worker started, interval={interval_seconds}s, mode=platform-schedule-upload", flush=True)
     while True:
         jobs = due_jobs()
         for job in jobs:
