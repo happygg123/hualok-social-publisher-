@@ -25,7 +25,7 @@ def init_db(db_path: Path | str = DB_PATH) -> None:
             """
             CREATE TABLE IF NOT EXISTS publish_jobs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                account TEXT NOT NULL DEFAULT 'gavin',
+                account TEXT NOT NULL DEFAULT 'hualok',
                 video TEXT NOT NULL,
                 cover TEXT NOT NULL DEFAULT '',
                 title TEXT NOT NULL,
@@ -90,7 +90,7 @@ def create_job(data: dict[str, Any], db_path: Path | str = DB_PATH) -> int:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)
             """,
             (
-                data.get("account") or "gavin",
+                data.get("account") or "hualok",
                 data.get("video") or "",
                 data.get("cover") or "",
                 data.get("title") or "",
@@ -191,7 +191,7 @@ def insert_attempt(job_id: int, result: dict[str, Any], db_path: Path | str = DB
 def job_to_master_row(job: dict[str, Any]) -> dict[str, str]:
     return {
         "id": str(job["id"]),
-        "account": job.get("account", "gavin"),
+        "account": job.get("account", "hualok"),
         "video": job.get("video", ""),
         "cover": job.get("cover", ""),
         "title": job.get("title", ""),

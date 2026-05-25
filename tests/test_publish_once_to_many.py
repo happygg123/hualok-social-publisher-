@@ -13,7 +13,7 @@ def test_expand_master_rows_creates_one_row_per_platform_with_shared_metadata():
     rows = [
         {
             "id": "001",
-            "account": "gavin",
+            "account": "hualok",
             "video": r"D:\videos\001.mp4",
             "cover": r"D:\videos\001.jpg",
             "title": "标题",
@@ -41,7 +41,7 @@ def test_expand_master_rows_supports_platform_specific_overrides():
     rows = [
         {
             "id": "001",
-            "account": "gavin",
+            "account": "hualok",
             "video": r"D:\videos\001.mp4",
             "cover": r"D:\videos\001.jpg",
             "title": "通用标题",

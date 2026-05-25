@@ -168,7 +168,7 @@ def page(title: str, body: str) -> bytes:
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <div class="brand"><div class="logo">G</div><div><div class="brand-title">Gavin Publisher</div><div class="brand-sub">视频号 / 抖音 / 小红书</div></div></div>
+      <div class="brand"><div class="logo">H</div><div><div class="brand-title">HuaLok Publisher</div><div class="brand-sub">视频号 / 抖音 / 小红书</div></div></div>
       <nav class="nav"><a class="active" href="/">⌘ 发布任务</a><a href="/new">＋ 新建任务</a></nav>
       <div class="side-card">本地可视化发布中控台。worker 每 30 秒扫描一次，到点自动发布；也可手动立即执行或失败重试。</div>
     </aside>
@@ -249,7 +249,7 @@ def new_job_body() -> str:
       </div>
       <section class='card card-pad'>
         <form method='post' action='/create' class='form-grid'>
-          <div><label>账号</label><input name='account' value='gavin'></div>
+          <div><label>账号</label><input name='account' value='hualok'></div>
           <div><label>平台</label><input name='platforms' value='tencent,douyin,xiaohongshu' required><div class='hint'>可选：tencent,douyin,xiaohongshu</div></div>
           <div class='form-full'><label>视频路径</label><input name='video' placeholder='D:\\下载\\hermes视频素材\\xxx.mp4' required></div>
           <div class='form-full'><label>封面路径</label><input name='cover' placeholder='D:\\下载\\hermes视频素材\\cover.png'></div>

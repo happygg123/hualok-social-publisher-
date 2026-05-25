@@ -50,7 +50,7 @@ def run_loop(interval_seconds: int, headed: bool, timeout_seconds: int) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Gavin social publisher worker")
+    parser = argparse.ArgumentParser(description="HuaLok social publisher worker")
     parser.add_argument("--once", action="store_true", help="只扫描并执行一次到期任务")
     parser.add_argument("--job-id", type=int, default=0, help="直接执行指定任务")
     parser.add_argument("--interval", type=int, default=30, help="循环扫描间隔秒数")

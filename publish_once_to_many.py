@@ -75,7 +75,7 @@ def expand_master_rows(rows: list[dict]) -> list[dict]:
         title = (row.get("title") or "").strip()
         if not title and not any((row.get(f"{p}_title") or "").strip() for p in platforms):
             raise ValueError(f"第 {index} 行缺少 title")
-        account_default = (row.get("account") or "gavin").strip()
+        account_default = (row.get("account") or "hualok").strip()
         for platform in platforms:
             expanded.append(
                 {
